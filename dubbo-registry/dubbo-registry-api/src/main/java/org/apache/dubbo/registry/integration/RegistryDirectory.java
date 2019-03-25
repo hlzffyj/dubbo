@@ -152,8 +152,17 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
 
     public void subscribe(URL url) {
         setConsumerUrl(url);
+        /**
+         * 监听consumer的congfig配置
+         */
         consumerConfigurationListener.addNotifyListener(this);
+        /**
+         * 监听服务的配置
+         */
         serviceConfigurationListener = new ReferenceConfigurationListener(this, url);
+        /**
+         * 因为我们一般用的是zookeeper 所以这里registry 我们只看zk的
+         */
         registry.subscribe(url, this);
     }
 
@@ -192,6 +201,9 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
 
     @Override
     public synchronized void notify(List<URL> urls) {
+        /**
+         * 对2.7版本的cli不必要去监听旧版本的信息，进行一个过滤
+         */
         Map<String, List<URL>> categoryUrls = urls.stream()
                 .filter(Objects::nonNull)
                 .filter(this::isValidCategory)
@@ -206,21 +218,32 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
                     }
                     return "";
                 }));
-
+        /**
+         * 根据不用的目录(route/privides/config)下面的进行解析
+         */
         List<URL> configuratorURLs = categoryUrls.getOrDefault(CONFIGURATORS_CATEGORY, Collections.emptyList());
         this.configurators = Configurator.toConfigurators(configuratorURLs).orElse(this.configurators);
 
         List<URL> routerURLs = categoryUrls.getOrDefault(ROUTERS_CATEGORY, Collections.emptyList());
+        /**
+         * 增加到路有链
+         */
         toRouters(routerURLs).ifPresent(this::addRouters);
 
         // providers
         List<URL> providerURLs = categoryUrls.getOrDefault(PROVIDERS_CATEGORY, Collections.emptyList());
+        /**
+         * 刷新参数
+         */
         refreshOverrideAndInvoker(providerURLs);
     }
 
     private void refreshOverrideAndInvoker(List<URL> urls) {
         // mock zookeeper://xxx?mock=return null
         overrideDirectoryUrl();
+        /**
+         * 根据过滤完后的url 去构造urlInvoker,并缓存到客户端
+         */
         refreshInvoker(urls);
     }
 
@@ -262,6 +285,9 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
             if (invokerUrls.isEmpty()) {
                 return;
             }
+            /**
+             * 把各个服务提供者翻译成invoker
+             */
             Map<String, Invoker<T>> newUrlInvokerMap = toInvokers(invokerUrls);// Translate url list to Invoker map
 
             /**
@@ -277,11 +303,20 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
                         .toString()));
                 return;
             }
-
+            /**
+             * 获得了 所有服务体统这的inovkers (这里还没有进行过滤)
+             */
             List<Invoker<T>> newInvokers = Collections.unmodifiableList(new ArrayList<>(newUrlInvokerMap.values()));
             // pre-route and build cache, notice that route cache should build on original Invoker list.
             // toMergeMethodInvokerMap() will wrap some invokers having different groups, those wrapped invokers not should be routed.
+            /**
+             * 将路由信息初始化，赋值给服务目录也就是这个类本身（routerChain）
+             * 这里面的notify 只有tagtouter 进行了使用
+             */
             routerChain.setInvokers(newInvokers);
+            /**
+             * this.invokers 当前消费者调用服务的，所有服务的提供者(这里还没有进行过滤)
+             */
             this.invokers = multiGroup ? toMergeInvokerList(newInvokers) : newInvokers;
             this.urlInvokerMap = newUrlInvokerMap;
 
@@ -405,6 +440,11 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
                         enabled = url.getParameter(Constants.ENABLED_KEY, true);
                     }
                     if (enabled) {
+                        /**
+                         * 具体转换的invoker
+                         * 每个invoker 其实都是一个Httpclient的调用
+                         * 一个invoker--->InvokerDelegate
+                         */
                         invoker = new InvokerDelegate<>(protocol.refer(serviceType, url), url, providerUrl);
                     }
                 } catch (Throwable t) {
@@ -581,6 +621,9 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
                 }
             }
         }*/
+        /**
+         * 路有链过滤之后的invoker
+         */
         return invokers == null ? Collections.emptyList() : invokers;
     }
 
@@ -696,12 +739,19 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
         ReferenceConfigurationListener(RegistryDirectory directory, URL url) {
             this.directory = directory;
             this.url = url;
+            /**
+             * 初始化服务监听器
+             * 这里监听的是服务
+             */
             this.initWith(url.getEncodedServiceKey() + Constants.CONFIGURATORS_SUFFIX);
         }
 
         @Override
         protected void notifyOverrides() {
             // to notify configurator/router changes
+            /**
+             * 如果配置改变的话，会刷线服务提供者的信息
+             */
             directory.refreshInvoker(Collections.emptyList());
         }
     }
@@ -709,6 +759,9 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
     private static class ConsumerConfigurationListener extends AbstractConfiguratorListener {
         List<RegistryDirectory> listeners = new ArrayList<>();
 
+        /**
+         * 监听consumer/configurators目录
+         */
         ConsumerConfigurationListener() {
             this.initWith(ApplicationModel.getApplication() + Constants.CONFIGURATORS_SUFFIX);
         }

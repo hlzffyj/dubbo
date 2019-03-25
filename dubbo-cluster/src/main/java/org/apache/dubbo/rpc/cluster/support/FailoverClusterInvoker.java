@@ -53,9 +53,16 @@ public class FailoverClusterInvoker<T> extends AbstractClusterInvoker<T> {
     @Override
     @SuppressWarnings({"unchecked", "rawtypes"})
     public Result doInvoke(Invocation invocation, final List<Invoker<T>> invokers, LoadBalance loadbalance) throws RpcException {
+        /**
+         * 根据路由规则过滤完成之后的invokers
+         */
         List<Invoker<T>> copyInvokers = invokers;
         checkInvokers(copyInvokers, invocation);
         String methodName = RpcUtils.getMethodName(invocation);
+        /**
+         * 重试次数retries
+         * 如果设置为2 说明重试两次，加上刚开始访问一次总共是3次
+         */
         int len = getUrl().getMethodParameter(methodName, Constants.RETRIES_KEY, Constants.DEFAULT_RETRIES) + 1;
         if (len <= 0) {
             len = 1;
@@ -73,10 +80,20 @@ public class FailoverClusterInvoker<T> extends AbstractClusterInvoker<T> {
                 // check again
                 checkInvokers(copyInvokers, invocation);
             }
+            /**
+             * 第一次调用失败之后，已经调用过的invoked，在第二次调用，会重新选择一个invoker 进行调用
+             * 如果只有一台，则会继续调用这个invoker 继续重试
+             */
             Invoker<T> invoker = select(loadbalance, invocation, copyInvokers, invoked);
+            /**
+             * 代表invoke 已经被调用了一次
+             */
             invoked.add(invoker);
             RpcContext.getContext().setInvokers((List) invoked);
             try {
+                /**
+                 * 这里的方法才是真正的调用
+                 */
                 Result result = invoker.invoke(invocation);
                 if (le != null && logger.isWarnEnabled()) {
                     logger.warn("Although retry the method " + methodName

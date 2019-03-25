@@ -348,12 +348,18 @@ public class RegistryProtocol implements Protocol {
                 .setProtocol(url.getParameter(REGISTRY_KEY, DEFAULT_REGISTRY))
                 .removeParameter(REGISTRY_KEY)
                 .build();
+        /**
+         * 获取 registry的一个实现类，例如dubbo Registry、RedisRegistry
+         */
         Registry registry = registryFactory.getRegistry(url);
         if (RegistryService.class.equals(type)) {
             return proxyFactory.getInvoker((T) registry, type, url);
         }
 
         // group="a,b" or group="*"
+        /**
+         * 获取dubbo url 中的refer参数封装成Map
+         */
         Map<String, String> qs = StringUtils.parseQueryString(url.getParameterAndDecoded(REFER_KEY));
         String group = qs.get(Constants.GROUP_KEY);
         if (group != null && group.length() > 0) {
@@ -369,26 +375,51 @@ public class RegistryProtocol implements Protocol {
     }
 
     private <T> Invoker<T> doRefer(Cluster cluster, Registry registry, Class<T> type, URL url) {
+        /**
+         * 服务目录
+         */
         RegistryDirectory<T> directory = new RegistryDirectory<T>(type, url);
+        /**
+         * 设置下注册中心
+         */
         directory.setRegistry(registry);
+        /**
+         * 设置协议代理类
+         */
         directory.setProtocol(protocol);
         // all attributes of REFER_KEY
+        /**
+         * 获取消费者调用服务端的一些参数
+         */
         Map<String, String> parameters = new HashMap<String, String>(directory.getUrl().getParameters());
+        /**
+         * 将消费端信息转成Url,并注册到注册中心
+         */
         URL subscribeUrl = new URL(CONSUMER_PROTOCOL, parameters.remove(REGISTER_IP_KEY), 0, type.getName(), parameters);
         if (!ANY_VALUE.equals(url.getServiceInterface()) && url.getParameter(REGISTER_KEY, true)) {
             directory.setRegisteredConsumerUrl(getRegisteredConsumerUrl(subscribeUrl, url));
             registry.register(directory.getRegisteredConsumerUrl());
         }
         /**
+         * 对服务目录的路有链
          * 初始化并构造路有链，并按路由优先级进行排序
+         * routerChain,这里如果我们配置了路由信息的话，标签路由(只能根据应用名，这个是有dubbo 2.7才有的功能所以不需要兼容)、条件路由(根据服务创建的路由等，并且会兼容创建dubbo2.6的路由信息)
+         * 黑白名单  路由为了 根据配置的一些条件进行服务的过滤，比如Ip
+         *
          */
         directory.buildRouterChain(subscribeUrl);
         /**
-         * 把所有的url(router,config,privetders 转换成invoker)
+         * 把所有的url(category,router,config,privetders 转换成invoker)
+         * 订阅一些目目录(如果我们的服务这次成功、并分组、有路由设置和配置信息配置的话(参数：timeout等)就会在zookeeper 产生这些目录)
          */
         directory.subscribe(subscribeUrl.addParameter(CATEGORY_KEY,
                 PROVIDERS_CATEGORY + "," + CONFIGURATORS_CATEGORY + "," + ROUTERS_CATEGORY));
-
+        /**
+         * 所有invokers 实例化之后进行合并()
+         * 服务目录合并
+         * 默认的是FailOVerCluster
+         * 但是他还有很多包装类，也就是Wrapper(MockClusterWrapper)
+         */
         Invoker invoker = cluster.join(directory);
         ProviderConsumerRegTable.registerConsumer(invoker, url, subscribeUrl, directory);
         return invoker;

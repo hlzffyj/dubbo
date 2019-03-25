@@ -221,6 +221,9 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
     }
 
     public synchronized T get() {
+        /**
+         * 检查配置，更新被调用服务配置(url后面跟的timeout 等信息)
+         */
         checkAndUpdateSubConfigs();
 
         if (destroyed) {
@@ -253,6 +256,9 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
         if (initialized) {
             return;
         }
+        /**
+         * 检查配置
+         */
         initialized = true;
         checkStubAndLocal(interfaceClass);
         checkMock(interfaceClass);
@@ -275,6 +281,9 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
             }
         }
         map.put(Constants.INTERFACE_KEY, interfaceName);
+        /**
+         * 系统参数、配置中心、xml、properties的参数覆盖
+         */
         appendParameters(map, application);
         appendParameters(map, module);
         appendParameters(map, consumer, Constants.DEFAULT_KEY);
@@ -300,7 +309,10 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
             hostToRegistry = NetUtils.getLocalHost();
         }
         map.put(Constants.REGISTER_IP_KEY, hostToRegistry);
-
+        /**
+         * 这个map 放的就是一个Application，port、调用哪个接口等参数消费者的
+         * 最终这里的ref 初始化完成的invoker 对象就是MockClusterInvoker的代理类
+         */
         ref = createProxy(map);
 
         ApplicationModel.initConsumerModel(getUniqueServiceName(), buildConsumerModel(attributes));
@@ -371,8 +383,14 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
              * |只有一个地址  一个注册中心 /服务地址
              */
             if (urls.size() == 1) {
+                /**
+                 * 这里的invoker 其实最终返回的就是MockClusterInvoker
+                 */
                 invoker = refprotocol.refer(interfaceClass, urls.get(0));
             } else {
+                /**
+                 * 混合目录处理  后面
+                 */
                 List<Invoker<?>> invokers = new ArrayList<Invoker<?>>();
                 URL registryURL = null;
                 for (URL url : urls) {
@@ -385,8 +403,10 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
                     // use RegistryAwareCluster only when register's cluster is available
                     URL u = registryURL.addParameter(Constants.CLUSTER_KEY, RegistryAwareCluster.NAME);
                     // The invoker wrap relation would be: RegistryAwareClusterInvoker(StaticDirectory) -> FailoverClusterInvoker(RegistryDirectory, will execute route) -> Invoker
+
                     invoker = cluster.join(new StaticDirectory(u, invokers));
                 } else { // not a registry url, must be direct invoke.
+
                     invoker = cluster.join(new StaticDirectory(invokers));
                 }
             }
@@ -410,6 +430,11 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
             metadataReportService.publishConsumer(consumerURL);
         }
         // create service proxy
+
+        //这里的invoker 其实最终返回的就是MockClusterInvoker
+        /**
+         * 最终返回来的是MockClusterInvoker的代理类
+         */
         return (T) proxyFactory.getProxy(invoker);
     }
 

@@ -87,18 +87,30 @@ final public class MockInvoker<T> implements Invoker<T> {
 
     @Override
     public Result invoke(Invocation invocation) throws RpcException {
+        /**
+         * 先尝试去获取调用方法的mock
+         */
         String mock = getUrl().getParameter(invocation.getMethodName() + "." + Constants.MOCK_KEY);
         if (invocation instanceof RpcInvocation) {
             ((RpcInvocation) invocation).setInvoker(this);
         }
         if (StringUtils.isBlank(mock)) {
+            /**
+             * 如果方法mock 为空，尝试获取类的服务的mock
+             */
             mock = getUrl().getParameter(Constants.MOCK_KEY);
         }
 
         if (StringUtils.isBlank(mock)) {
             throw new RpcException(new IllegalAccessException("mock can not be null. url :" + url));
         }
+        /**
+         * 参数解码
+         */
         mock = normalizeMock(URL.decode(mock));
+        /**
+         * 判断是否return 开头
+         */
         if (mock.startsWith(Constants.RETURN_PREFIX)) {
             mock = mock.substring(Constants.RETURN_PREFIX.length()).trim();
             try {
@@ -110,6 +122,9 @@ final public class MockInvoker<T> implements Invoker<T> {
                         + ", mock:" + mock + ", url: " + url, ew);
             }
         } else if (mock.startsWith(Constants.THROW_PREFIX)) {
+            /**
+             * 盘算是否throw 开头，抛出异常
+             */
             mock = mock.substring(Constants.THROW_PREFIX.length()).trim();
             if (StringUtils.isBlank(mock)) {
                 throw new RpcException("mocked exception for service degradation.");
@@ -119,6 +134,9 @@ final public class MockInvoker<T> implements Invoker<T> {
             }
         } else { //impl mock
             try {
+                /**
+                 * 创建mockInvoker代理类，并执行对应的inovker方法
+                 */
                 Invoker<T> invoker = getInvoker(mock);
                 return invoker.invoke(invocation);
             } catch (Throwable t) {

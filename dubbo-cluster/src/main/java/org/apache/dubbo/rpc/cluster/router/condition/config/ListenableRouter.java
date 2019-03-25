@@ -67,6 +67,12 @@ public abstract class ListenableRouter extends AbstractRouter implements Configu
             conditionRouters = Collections.emptyList();
         } else {
             try {
+                /**
+                 * 解析路由配置
+                 * 并把这些路由信息增加到
+                 * conditionRouters
+                 * 但是这里并没有初始化标签路由
+                 */
                 routerRule = ConditionRuleParser.parse(event.getValue());
                 generateConditions(routerRule);
             } catch (Exception e) {
@@ -117,9 +123,19 @@ public abstract class ListenableRouter extends AbstractRouter implements Configu
         if (StringUtils.isEmpty(ruleKey)) {
             return;
         }
+        /**
+         * 对路由条件的Key/路由目录加一个监听器
+         * app-proverd/condition-router
+         */
         String routerKey = ruleKey + RULE_SUFFIX;
+
         configuration.addListener(routerKey, this);
         String rule = configuration.getConfig(routerKey);
+        /**
+         * 监听到执行动作，并进行相应操作 delete/MODIFIED
+         * 默认监听MODIFIED
+         * 并解析配置信息
+         */
         if (StringUtils.isNotEmpty(rule)) {
             this.process(new ConfigChangeEvent(routerKey, rule));
         }

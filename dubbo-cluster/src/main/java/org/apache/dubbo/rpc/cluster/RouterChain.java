@@ -47,12 +47,27 @@ public class RouterChain<T> {
     }
 
     private RouterChain(URL url) {
+        /**
+         * 获取加了Activate(活跃的路由)工厂
+         * 如果没有就拿出来所有的 默认拿出来4个
+         * mock、tag、app、service routeFactory
+         */
         List<RouterFactory> extensionFactories = ExtensionLoader.getExtensionLoader(RouterFactory.class)
                 .getActivateExtension(url, (String[]) null);
-
+        /**
+         * 循环上面获取的route 并实例化
+         * 这些route 都继承了 listabaleRouter
+         * route 优先级
+         * tag 100
+         * service 140
+         * app 150
+         */
         List<Router> routers = extensionFactories.stream()
                 .map(factory -> factory.getRouter(url))
                 .collect(Collectors.toList());
+        /**
+         * 对路由初始化 其实就是赋值给roterChain的属性，排序
+         */
 
         initWithRouters(routers);
     }

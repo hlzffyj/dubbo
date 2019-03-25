@@ -153,6 +153,9 @@ public class ZookeeperRegistry extends FailbackRegistry {
                 }
             } else {
                 List<URL> urls = new ArrayList<>();
+                /**
+                 * 分别对providers、congfigurators、routes(2.7版本以前 全局配置信息、路由配置信息会在这两个目录下面congfigurators、routes)
+                 */
                 for (String path : toCategoriesPath(url)) {
                     ConcurrentMap<NotifyListener, ChildListener> listeners = zkListeners.get(url);
                     if (listeners == null) {
@@ -170,6 +173,10 @@ public class ZookeeperRegistry extends FailbackRegistry {
                         urls.addAll(toUrlsWithEmpty(url, path, children));
                     }
                 }
+
+                /**
+                 * 对这三个目录下的url进行处理
+                 */
                 notify(url, listener, urls);
             }
         } catch (Throwable e) {

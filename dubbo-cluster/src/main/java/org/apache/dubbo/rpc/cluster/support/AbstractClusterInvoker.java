@@ -118,11 +118,15 @@ public abstract class AbstractClusterInvoker<T> implements Invoker<T> {
             return null;
         }
         String methodName = invocation == null ? StringUtils.EMPTY : invocation.getMethodName();
-
+        /**
+         * stick = true 如果想要急促调用这个连接的话，则配置这个stick，不再进行负载重新选择（粘滞连接）
+         *
+         */
         boolean sticky = invokers.get(0).getUrl()
                 .getMethodParameter(methodName, Constants.CLUSTER_STICKY_KEY, Constants.DEFAULT_CLUSTER_STICKY);
 
         //ignore overloaded method
+
         if (stickyInvoker != null && !invokers.contains(stickyInvoker)) {
             stickyInvoker = null;
         }
@@ -132,7 +136,9 @@ public abstract class AbstractClusterInvoker<T> implements Invoker<T> {
                 return stickyInvoker;
             }
         }
-
+        /**
+         * stick = false ,重新去选择为调用过的服务
+         */
         Invoker<T> invoker = doSelect(loadbalance, invocation, invokers, selected);
 
         if (sticky) {
@@ -150,12 +156,19 @@ public abstract class AbstractClusterInvoker<T> implements Invoker<T> {
         if (invokers.size() == 1) {
             return invokers.get(0);
         }
+        /**
+         * 负载均衡，很有可能在重新负载的时候选择了一个已经调用但是失败的invoker
+         * 这里的策略是比较新选出来的invoker 是否在已经调用的队列里面，如果再，则重新选择新的inovker
+         */
         Invoker<T> invoker = loadbalance.select(invokers, getUrl(), invocation);
 
         //If the `invoker` is in the  `selected` or invoker is unavailable && availablecheck is true, reselect.
         if ((selected != null && selected.contains(invoker))
                 || (!invoker.isAvailable() && getUrl() != null && availablecheck)) {
             try {
+                /**
+                 * 重新对invokers 进行筛选返回新的inovker 的list(不包含以调用过的)
+                 */
                 Invoker<T> rinvoker = reselect(loadbalance, invocation, invokers, selected, availablecheck);
                 if (rinvoker != null) {
                     invoker = rinvoker;
@@ -235,10 +248,20 @@ public abstract class AbstractClusterInvoker<T> implements Invoker<T> {
         if (contextAttachments != null && contextAttachments.size() != 0) {
             ((RpcInvocation) invocation).addAttachments(contextAttachments);
         }
-
+        /**
+         * 获取invoker list
+         * 获取经过路由过滤后，最终返回符合路由规则的服务提供者
+         */
         List<Invoker<T>> invokers = list(invocation);
+        /**
+         * 初始化负责均衡，这里就是确定一下你要用哪种负载均衡
+         * 默认的是随机负责均衡
+         */
         LoadBalance loadbalance = initLoadBalance(invokers, invocation);
         RpcUtils.attachInvocationIdIfAsync(getUrl(), invocation);
+        /**
+         * 这时候真正执行failoverClusterInvoker的doInvoke
+         */
         return doInvoke(invocation, invokers, loadbalance);
     }
 

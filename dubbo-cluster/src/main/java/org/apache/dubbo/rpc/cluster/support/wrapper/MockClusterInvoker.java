@@ -69,12 +69,23 @@ public class MockClusterInvoker<T> implements Invoker<T> {
     @Override
     public Result invoke(Invocation invocation) throws RpcException {
         Result result = null;
+        /**
+         * 从服务目录里面取url
+         */
 
         String value = directory.getUrl().getMethodParameter(invocation.getMethodName(), Constants.MOCK_KEY, Boolean.FALSE.toString()).trim();
         if (value.length() == 0 || value.equalsIgnoreCase("false")) {
             //no mock
+            /**
+             * 没有配置mock 直接往下层调用
+             * 之类非invoker 就是failoverCLusterInvoker
+             * 先走父类的invoker 方法
+             */
             result = this.invoker.invoke(invocation);
         } else if (value.startsWith("force")) {
+            /**
+             * 以force 开头 直接走mock 逻辑
+             */
             if (logger.isWarnEnabled()) {
                 logger.warn("force-mock: " + invocation.getMethodName() + " force-mock enabled , url : " + directory.getUrl());
             }
@@ -82,6 +93,10 @@ public class MockClusterInvoker<T> implements Invoker<T> {
             result = doMockInvoke(invocation, null);
         } else {
             //fail-mock
+            /**
+             * 不是force，但是配置了mock 类。
+             * 当调用失败之后走mock 逻辑
+             */
             try {
                 result = this.invoker.invoke(invocation);
             } catch (RpcException e) {
@@ -92,6 +107,9 @@ public class MockClusterInvoker<T> implements Invoker<T> {
                 if (logger.isWarnEnabled()) {
                     logger.warn("fail-mock: " + invocation.getMethodName() + " fail-mock enabled , url : " + directory.getUrl(), e);
                 }
+                /**
+                 * 执行mock
+                 */
                 result = doMockInvoke(invocation, e);
             }
         }
@@ -102,7 +120,9 @@ public class MockClusterInvoker<T> implements Invoker<T> {
     private Result doMockInvoke(Invocation invocation, RpcException e) {
         Result result = null;
         Invoker<T> minvoker;
-
+        /**
+         * 获取RpcInvocation
+         */
         List<Invoker<T>> mockInvokers = selectMockInvoker(invocation);
         if (CollectionUtils.isEmpty(mockInvokers)) {
             minvoker = (Invoker<T>) new MockInvoker(directory.getUrl());
@@ -110,6 +130,9 @@ public class MockClusterInvoker<T> implements Invoker<T> {
             minvoker = mockInvokers.get(0);
         }
         try {
+            /**
+             * 这里走MockInvoker的invoke
+             */
             result = minvoker.invoke(invocation);
         } catch (RpcException me) {
             if (me.isBiz()) {

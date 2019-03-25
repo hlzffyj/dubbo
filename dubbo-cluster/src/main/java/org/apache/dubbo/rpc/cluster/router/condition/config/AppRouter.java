@@ -30,7 +30,16 @@ public class AppRouter extends ListenableRouter {
      */
     private static final int APP_ROUTER_DEFAULT_PRIORITY = 150;
 
+    /**
+     *
+     * @param configuration
+     * @param url
+     * DynamicConfiguration 有几个实现类 Apollo、zookeeper、
+     */
     public AppRouter(DynamicConfiguration configuration, URL url) {
+        /**
+         * 调用父类 去初始化路由
+         */
         super(configuration, url, url.getParameter(Constants.APPLICATION_KEY));
         this.priority = APP_ROUTER_DEFAULT_PRIORITY;
     }

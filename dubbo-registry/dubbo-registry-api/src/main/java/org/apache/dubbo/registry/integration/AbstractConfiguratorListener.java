@@ -42,6 +42,9 @@ public abstract class AbstractConfiguratorListener implements ConfigurationListe
         DynamicConfiguration dynamicConfiguration = DynamicConfiguration.getDynamicConfiguration();
         dynamicConfiguration.addListener(key, this);
         String rawConfig = dynamicConfiguration.getConfig(key);
+        /**
+         * 处理服务目录下的config 配置信息变化
+         */
         if (!StringUtils.isEmpty(rawConfig)) {
             process(new ConfigChangeEvent(key, rawConfig));
         }
@@ -67,6 +70,12 @@ public abstract class AbstractConfiguratorListener implements ConfigurationListe
                 return;
             }
         }
+        /**
+         * 更新服务目录下信息变化
+         * 因为监听的是服务目录，源码debug 走到这一步
+         * 会发现其实执行的是RegistryDirectory的notifyOverrides
+         * 重写/刷新服务的一些配置信息(你改变了什么配置，在这里就会刷新什么配置但是程序员对配置的优先级一定得清楚)
+         */
 
         notifyOverrides();
     }
